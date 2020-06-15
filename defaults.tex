@@ -1,0 +1,962 @@
+\documentclass{article}
+
+% \prooftree and related commands
+\usepackage{ebproof}
+% most symbols
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+% \RHD
+\usepackage[nointegrals]{wasysym}
+\usepackage{xcolor}
+
+\newcommand{\ignore}[1]{}
+\newcommand{\todo}[1]{\colorbox{red}{#1}}
+\newcommand{\consider}[1]{\colorbox{red}{!!!} #1 \colorbox{red}{!!!}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+
+\newcommand{\define}{::=}
+\newcommand{\G}{\Gamma}
+
+\renewcommand{\implies}{\Rightarrow}
+\newcommand{\variant}[1]{[\!|#1|\!]}
+\newcommand{\case}[2]{\tt{case}\,#1\,#2}
+\newcommand{\app}[2]{#1\,#2}
+\newcommand{\lam}[2]{\lambda #1 . #2}
+
+\newcommand{\hastp}[3]{#1 \vdash #2 \,:\, #3}
+\newcommand{\haslbl}[3]{#1\;|\;#2\,:\, #3}
+\newcommand{\caseVarRcd}[3]{#1 \;\sqsubseteq\; #2 \,:\, #3}
+\newcommand{\projFun}{\,\langle\!\!\#\,}
+\newcommand{\projArg}{\,\#\!\!\rangle\,}
+\newcommand{\projFunRule}[3]{#1 \;\trianglelefteq\; #2 \,@\, #3}
+\newcommand{\projArgRule}[3]{#1 \;\trianglerighteq\; #2 \,@\, #3}
+
+\newcommand{\haslbltm}[3]{#1\,|\,#2\,\hookrightarrow\, #3}
+\newcommand{\eval}[2]{#1 \hookrightarrow #2}
+\newcommand{\step}[2]{#1 \leadsto #2}
+\newcommand{\steps}[2]{#1 \leadsto^* #2}
+
+\renewcommand{\impliedby}{\Leftarrow}
+\newcommand{\B}{\mathcal{B}}
+\newcommand{\C}{\mathcal{C}}
+\newcommand{\bottom}{\perp}
+\newcommand{\marker}[1]{\RHD_{#1}}
+\newcommand{\subtype}{<:}
+\newcommand{\multisubtype}{<\!\!<:}
+\newcommand{\multisuptype}{:>\!\!>}
+\newcommand{\synthesizes}{\Rightarrow \!\!\! \Rightarrow}
+%\newcommand{\app}{\bullet}
+\newcommand{\prj}{\,\pmb{\#}\,}
+\newcommand{\instL}{\;\substack{<\\:=}\;}
+\newcommand{\instR}{\;\substack{<\\=:}\;}
+\newcommand{\ev}{\hat}
+\newcommand{\spc}{\qquad}
+\newcommand{\apply}[1]{\left[#1\right]}
+
+\newcommand{\rnil}{\{\}}
+\newcommand{\rcons}[2]{\{#1 \,|\, #2\}}
+
+\newcommand{\synth}[4]{#1 \vdash #2 \Rightarrow #3 \dashv #4}
+\renewcommand{\check}[4]{#1 \vdash #2 \Leftarrow #3 \dashv #4}
+
+\newcommand{\presynth}[6]{#1 \vdash #2 #3 #4 \synthesizes #5 \dashv #6}
+
+\newcommand{\subtypes}[4]{#1 \vdash #2 \subtype #3 \dashv #4}
+\newcommand{\multisubtypes}[4]{#1 \vdash #2 \multisubtype #3 \dashv #4}
+\newcommand{\subtypesmulti}[4]{#1 \vdash #3 \multisuptype #2 \dashv #4}
+
+\newcommand{\refinesL}[4]{#1 \vdash #2 \instL #3 \dashv #4}
+\newcommand{\refinesR}[4]{#1 \vdash #2 \instR #3 \dashv #4}
+
+\newcommand{\Glb}[4]{#1 \vdash \bigvee #2 \synthesizes #3 \ignore{\dashv #4}}
+\newcommand{\Lub}[4]{#1 \vdash \bigwedge #2 \synthesizes #3 \ignore{\dashv #4}}
+%\newcommand{\glbsynth}[5]{#1 \vdash #2 \glb #3 \synthesizes #4 \ignore{\dashv #5}}
+%\newcommand{\lubsynth}[5]{#1 \vdash #2 \lub #3 \synthesizes #4 \ignore{\dashv #5}}
+\newcommand{\glbsynth}[5]{#2 \glb #3 \synthesizes #4 \ignore{\dashv #5}}
+\newcommand{\lubsynth}[5]{#2 \lub #3 \synthesizes #4 \ignore{\dashv #5}}
+\newcommand{\glb}{\vee}
+\newcommand{\lub}{\wedge}
+\newcommand{\nilC}{\varnothing}
+\newcommand{\set}[1]{#1}
+
+\newcommand{\lookup}[5]{#1 \vdash #2 \# #3 \longrightarrow #4 \dashv #5}
+
+\newcommand{\deduct}[3][]
+{
+  \begin{prooftree}
+    \hypo{#2}
+    \infer1[\text{#1}]{#3}
+  \end{prooftree}
+}
+
+\begin{document}
+
+\section{Grammar}
+
+\subsection{Types}
+\[\begin{array}{rcl}
+\tau & \define & \alpha \mid \forall \alpha. \tau \mid \tau_0 \to \tau_1 \mid \{\rho\} \mid \variant{\rho}
+\\
+\rho & \define & \cdot \mid \_ : \tau \mid l : \tau, \rho
+\\
+l & \define & \text{row field labels}
+\\
+\alpha & \define & \text{bound type variables}
+\end{array}
+\]
+
+$FV(\tau)$ denotes the free type variables of $\tau$ defined in the
+usual way where the only type variable binder is $\forall\alpha.\tau$.
+
+A row is {\it closed} if it ends in $\cdot$. We abuse $,$ to stand
+for both adding a label to a row (e.g. $l:\tau,\rho$) and {\it appending}
+two rows together when the first row is closed; e.g.
+\[
+(l_0:\tau_0,\l_1:\tau_1,\cdot),(l_2:\tau_2,l_3:\tau_3,\_:\tau)
+\quad
+\equiv
+\quad
+l_0:\tau_0,\l_1:\tau_1,l_2:\tau_2,l_3:\tau_3,\_:\tau
+\]
+Furthermore, writing $\rho_0,\rho_1$ implies $\rho_0$ is closed,
+so $\rho,\_:\tau$ implies $\rho$ is closed and $\rho,\cdot
+\equiv \rho$.
+
+We do not forbid multiple occurrences of the same label in a row;
+outer (to the left) occurrences shadow inner occurences as specified
+in~\ref{subsec:type-lookup}.
+
+\subsection{Type Substitution}
+\[
+\begin{array}{rcl}
+  \alpha[\alpha := \tau] & = & \tau \\
+  \alpha'[\alpha := \tau] & = & \alpha' \quad(\alpha \neq \alpha') \\
+  (\forall \alpha. \tau')[\alpha := \tau] & = & \forall\alpha.\tau'\\
+  (\forall \alpha'. \tau')[\alpha := \tau] & = & \forall \alpha'' . \tau'[\alpha' := \alpha''][\alpha := \tau] \quad (\alpha \neq \alpha' \,\wedge\, \alpha\neq\alpha'' \,\wedge\, \alpha'' \not\in FV(\tau))\\
+  (\tau_0 \to \tau_1)[\alpha := \tau] & = & \tau_0[\alpha:=\tau]\to\tau_1[\alpha:=\tau]\\
+  \{\rho\}[\alpha := \tau] & = & \{\rho[\alpha:=\tau]\}\\
+  \variant{\rho}[\alpha := \tau] & = & \variant{\rho[\alpha:=\tau]} \\
+  \\
+  (\cdot)[\alpha := \tau] & = & \cdot \\
+  (\_ : \tau')[\alpha := \tau] & = & \_ : \tau'[\alpha := \tau] \\
+  (l:\tau', \rho)[\alpha := \tau] & = & l:\tau'[\alpha:=\tau],\rho[\alpha:=\tau]
+\end{array}
+\]
+
+\subsection{Terms}
+
+\[\begin{array}{rcl}
+e & \define & x \mid \lam{x}{e} \mid \app{e_0}{e_1} \mid \{r\} \mid e\#l \mid \variant{l:e} \mid \case{e_0}{e_1}
+\\
+r & \define & \cdot \mid \_ : e \mid l : e, r
+\\
+x & \define & \text{bound term variables}
+\end{array}
+\]
+
+$FV(e)$ denotes the free term variables of $e$ defined in the usual way where the only variable binder is $\lam{x}{e}$.
+
+\subsection{Term Substitution}
+\[
+\begin{array}{rcl}
+  x[x:=e] & = & e \\
+  x' [x:=e] & = & x' \quad (x\neq x') \\
+  (\lam{x}{e'})[x:=e] & = & \lam{x}{e'} \\
+  (\lam{x'}{e'})[x:=e] & = & \lam{x''}e'[x':=x''][x:=e] \quad (x\neq x' \,\wedge\, x\neq x'' \,\wedge\, x''\not\in FV(e)) \\
+  (\app{e_0}{e_1})[x:=e] & = & \app{e_0[x:=e]}{e_1[x:=e]} \\
+  \{r\}[x:=e] & = & \{r[x:=e]\} \\
+  (e'\#l)[x:=e] & = & (e'[x:=e])\#l \\
+  \variant{l:e'}[x:=e] & = & \variant{l:e'[x:=e]} \\
+  (\case{e_0}{e_1})[x:=e] & = & \case{e_0[x:=e]}{e_1[x:=e]} \\
+  \\
+  (\cdot)[x:=e] & = & \cdot \\
+  (\_ : e')[x:=e] & = & \_ : e'[x:=e] \\
+  (l : e', r)[x:=e] & = & l:e'[x:=e], r[x:=e]
+\end{array}
+\]
+
+\subsection{Contexts}
+\[\begin{array}{rcl}
+\G & \define & \cdot \mid x : \tau, \G
+\end{array}
+\]
+
+
+\section{Typing}
+
+\todo{Row type lookup needs a context}
+
+\subsection{Type Label Lookup \;($\haslbl{\rho}{l}{\tau}$)}
+\label{subsec:type-lookup}
+\[
+\deduct
+    {}
+    {\haslbl{\_ : \tau}{l}{\tau}}
+    {}
+\qquad
+\deduct
+    {}
+    {\haslbl{l:\tau,\rho}{l}{\tau}}
+    {}
+\qquad
+\deduct
+    {\haslbl{\rho}{l}{\tau}}
+    {\haslbl{l':\tau',\rho}{l}{\tau}}
+    {(l \neq l')}
+\qquad
+\deduct
+    {\haslbl{\rho}{l}{\forall\alpha.\tau}}
+    {\haslbl{\rho}{l}{\tau[\alpha := \tau']}}
+    {}
+\]
+
+Note that we allow instantiation of polymorphic fields during type
+label lookup to facilitate the formulation of the constraint, in~\ref{subsec:case-constraint}, on
+the rows involved in a $\case{e_0}{e_1}$ expression.
+
+\subsection{Case Constraint \;($\caseVarRcd{\rho_0}{\rho_1}{\tau}$)}
+\label{subsec:case-constraint}
+\[
+\deduct
+    {\haslbl{\rho_1}{l_0}{\tau_0\to\tau} \quad \caseVarRcd{\rho_0}{\rho_1}{\tau}}
+    {\caseVarRcd{l_0:\tau_0,\rho_0}{\rho_1}{\tau}}
+    {}
+\qquad
+\deduct
+    {}
+    {\caseVarRcd{\cdot}{\rho}{\tau}}
+    {}
+\qquad
+\deduct
+    {\haslbl{\rho}{l}{\tau_0\to\tau}}
+    {\caseVarRcd{\_:\tau_0}{\rho}{\tau}}
+    {(l\not\in\rho)}
+%\deduct
+%    {}
+%    {\caseVarRcd{\_:\tau_0}{\_ : \tau}{\tau}}
+%    {}
+%\qquad
+%\deduct
+%    {\caseVarRcd{\_:\tau_0}{\rho}{\tau}}
+%    {\caseVarRcd{\_:\tau_0}{l:\tau_l,\rho}{\tau}}
+%    {}
+\]
+The third rule above is meant to capture the idea that a variant type
+with a default label can only be ``eliminated'' by a record type with a
+default label.
+
+\subsection{Typing Rules \;($\hastp{\G}{e}{\tau}$)}
+
+\textbf{Quantifiers}
+\[
+\deduct
+    {\hastp{\G}{e}{\tau[\alpha := p]}}
+    {\hastp{\G}{e}{\forall \alpha . \tau}}
+    {(p\;\text{fresh})}
+\qquad
+\deduct
+    {\hastp{\G}{e}{\forall \alpha.\tau}}
+    {\hastp{\G}{e}{\tau[\alpha := \tau']}}
+    {}
+\]
+
+\noindent
+\textbf{Functions and bound variables}
+\[
+\deduct
+    {x:\tau \in \G}
+    {\hastp{\G}{x}{\tau}}
+    {}
+\qquad
+\deduct
+    {\hastp{\G,x:\tau_x}{e}{\tau}}
+    {\hastp{\G}{\lam{x}{e}}{\tau_x\to\tau}}
+    {}
+\qquad
+\deduct
+    {\hastp{\G}{e_0}{\tau_1\to\tau}
+     \quad
+     \hastp{\G}{e_1}{\tau_1}
+    }
+    {\hastp{\G}{\app{e_0}{e_1}}{\tau}}
+    {}
+\]
+
+\noindent
+\textbf{Records}
+\[
+\deduct
+    {}
+    {\hastp{\G}{\{\cdot\}}{\{\cdot\}}}
+    {}
+\qquad
+\deduct
+    {\hastp{\G}{e}{\tau}}
+    {\hastp{\G}{\{\_:e\}}{\{\_:\tau\}}}
+    {}
+\]
+
+\[
+\deduct
+    {\hastp{\G}{e}{\tau}
+      \quad
+      \hastp{\G}{\{r\}}{\{\rho\}}
+    }
+    {\hastp{\G}{\{l:e,r\}}{\{l:\tau,\rho\}}}
+    {}
+\qquad
+\deduct
+    {\hastp{\G}{e}{\{\rho\}}
+     \qquad
+     \haslbl{\rho}{l}{\tau}
+    }
+    {\hastp{\G}{e\#l}{\tau}}
+    {}
+\]
+
+\noindent
+\textbf{Variants}
+\[
+\deduct
+    {\hastp{\G}{e}{\tau}}
+    {\hastp{\G}{\variant{\_:e}}{\variant{\rho,\_:\tau}}}
+    {}
+\qquad
+\deduct
+    {\hastp{\G}{e}{\variant{\rho_0,l:\tau,\rho_1,\_:\tau}}}
+    {\hastp{\G}{e}{\variant{\rho_0,\rho_1,\_:\tau}}}
+    {(l\not\in\rho_0,\rho_1)}
+\]
+
+\[
+\deduct
+    {\hastp{\G}{e}{\tau}}
+    {\hastp{\G}{\variant{l:e}}{\variant{\rho_0,l:\tau,\rho_1}}}
+    {(l\not\in\rho_0)}
+\qquad
+\deduct
+    {\hastp{\G}{e_0}{\variant{\rho_0}}
+     \quad
+     \hastp{\G}{e_1}{\{\rho_1\}}
+     \quad
+     \caseVarRcd{\rho_0}{\rho_1}{\tau}
+    }
+    {\hastp{\G}{\case{e_0}{e_1}}{\tau}}
+    {}
+\]
+
+\subsection{Examples}
+(assume some base types and corresponding constants)
+
+Here are some expressions with their (not necessarily unique) deriveable types:
+\[\begin{array}{lcl}
+\case
+    {\variant{b:5}}
+    {\{a:\lam{x}{x + 1},\_:\lam{x}{x * 0}\}}
+& : &
+\tt{Num}
+\\
+\lam
+    {r}
+    {\case
+      {\variant{b:\tt{``b"}}}
+      {r}
+    }
+& : &
+\{a:{\tt{Num}}\to{\tt{Num}},\_:\forall\alpha.{\alpha}\to{\tt{Num}}\}
+\to
+\tt{Num}
+\\
+\variant{b:\tt{``b"}} & : & \variant{a:\{\},\_:\tt{Text}}
+\\
+\case
+  {\variant{b:\tt{``b"}}}
+  {\{a:\lam{x}{x + 1},\_:\lam{x}{0}\}}
+& : &
+\tt{Num}
+\\
+\case
+    {\variant{\_:\tt{``b"}}}
+    {\{a:\lam{x}{x + 1},\_:\lam{x}{0}\}}
+& : &
+\tt{Num}
+\end{array}
+\]
+
+Here are some untypeable expressions:
+\[\begin{array}{l}
+ \case
+   {\variant{b:\tt{``b"}}}
+   {\{a:\lam{x}{x + 1},\_:\lam{x}{x * 0}\}}
+\\
+ \case
+   {\variant{\_:\tt{``b"}}}
+   {\{a:\lam{x}{x + 1},b:\lam{x}{0}\}}
+\end{array}
+\]
+
+
+\section{Evaluation}
+
+\subsection{Term Label Lookup \;($\haslbltm{r}{l}{e}$)}
+\[
+\deduct
+    {}
+    {\haslbltm{\_ : e}{l}{e}}
+    {}
+\qquad
+\deduct
+    {}
+    {\haslbltm{l:e,r}{l}{e}}
+    {}
+\qquad
+\deduct
+    {\haslbltm{r}{l}{e}}
+    {\haslbltm{l':e',r}{l}{e}}
+    {(l \neq l')}
+\]
+
+\subsection{Evaluation Rules  \;($\eval{e_0}{e_1}$)}
+\[
+\deduct
+    {}
+    {\eval{\lam{x}{e}}{\lam{x}{e}}}
+    {}
+\qquad
+\deduct
+    {\eval{e_0}{\lam{x}{e'}}
+     \quad
+     \eval{e'[x:=e_1]}{e}
+    }
+    {\eval{\app{e_0}{e_1}}{e}}
+    {}
+\]
+
+\[
+\deduct
+    {}
+    {\eval{\{r\}}{\{r\}}}
+    {}
+\qquad
+\deduct
+    {\eval{e}{\{r\}}
+     \quad
+     \haslbltm{r}{l}{e_l}
+     \quad
+     \eval{e_l}{e'}
+    }
+    {\eval{e\#l}{e'}}
+    {}
+\]
+
+\[
+\deduct
+    {}
+    {\eval{\variant{l:e}}{\variant{l:e}}}
+    {}
+\qquad
+\deduct
+    {\eval{e_0}{\variant{l:e_l}}
+     \quad
+     \eval{e_1}{\{r\}}
+     \quad
+     \haslbltm{r}{l}{e_r}
+     \quad
+     \eval{\app{e_r}{e_l}}{e}
+    }
+    {\eval{\case{e_0}{e_1}}{e}}
+    {}
+\]
+
+\section{Correctness}
+
+\begin{theorem}
+$\forall e \,\tau . \exists e' . \;\;\hastp{\cdot}{e}{\tau}$ and $\eval{e}{e'}\;$ implies $\;\hastp{\cdot}{e'}{\tau}$
+\end{theorem}
+
+\section{A Tighter Coupling of Records and Variants}
+Record terms are currently used to consume variant terms, i.e. in
+$\case{e_0}{e_1}$, the second argument $e_1$ should be a record;
+however there is a bit of lost symmetry since variant terms are not
+involved in consuming records. In this section we slightly reformulate
+the system to allow this symmetry. Specifically we will use projection
+as the single elimination form for both records and variants, and we
+will modify projection to take a variant as a second argument, rather
+than a label; this change also removes the reliance on raw labels,
+which are not first class values, in the core expressions.
+\\
+
+\noindent
+\textbf{Variants}
+\\
+No $\tt{case}$ construct.
+\\
+
+\subsection{Project Fun \;($\projFunRule{\rho_0}{\rho_1}{\tau}$)}
+\label{subsec:case-constraint}
+\[
+\deduct
+    {\haslbl{\rho_0}{l_1}{\tau_1\to\tau} \quad \projFunRule{\rho_0}{\rho_1}{\tau}}
+    {\projFunRule{\rho_0}{l_1:\tau_1,\rho_1}{\tau}}
+    {}
+\qquad
+\deduct
+    {}
+    {\projFunRule{\rho}{\cdot}{\tau}}
+    {}
+\qquad
+\deduct
+    {\haslbl{\rho}{l}{\tau_0\to\tau}}
+    {\projFunRule{\rho}{\_:\tau_0}{\tau}}
+    {(l\not\in\rho)}
+\]
+Third rule above is interpretation of term variant default label as
+only being able to project the term record default label; removing the
+condition would change this to allowing the (non-deterministic)
+projection of any suitable label.
+
+\subsection{Project Arg \;($\projArgRule{\rho_0}{\rho_1}{\tau}$)}
+\label{subsec:case-constraint}
+\[
+\deduct
+    {\haslbl{\rho_0}{l_1}{\tau_1} \quad \projArgRule{\rho_0}{\rho_1}{\tau}}
+    {\projArgRule{\rho_0}{l_1:\tau_1\to\tau,\rho_1}{\tau}}
+    {}
+\qquad
+\deduct
+    {}
+    {\projArgRule{\rho}{\cdot}{\tau}}
+    {}
+\qquad
+\deduct
+    {\haslbl{\rho}{l}{\tau_0\to\tau}}
+    {\projArgRule{\rho}{\_:\tau_0}{\tau}}
+    {(l\not\in\rho)}
+\]
+\\
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\ignore{
+\noindent
+\textbf{New types}
+\[\begin{array}{rcl}
+\sigma & \define & \alpha \mid \forall \alpha. \sigma \mid \tau\to\tau
+\end{array}
+\]
+
+\noindent
+\textbf{Records}
+\[
+\deduct
+    {}
+    {\hastp{\G}{\{\cdot\}}{\{\cdot\}}}
+    {}
+\qquad
+\deduct
+    {\hastp{\G}{e}{\sigma}}
+    {\hastp{\G}{\{\_:e\}}{\{\_:\sigma\}}}
+    {}
+\qquad
+\deduct
+    {\hastp{\G}{e}{\sigma}
+      \quad
+      \hastp{\G}{\{r\}}{\{\rho\}}
+    }
+    {\hastp{\G}{\{l:e,r\}}{\{l:\sigma,\rho\}}}
+    {}
+\]
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% \[
+%% \deduct
+%%     {\hastp{\G}{e}{\tau}}
+%%     {\hastp{\G}{\variant{l:e}}{\variant{\rho_0,l:\tau,\rho_1}}}
+%%     {(l\not\in\rho_0)}
+%% \]
+
+%% \[
+%% \deduct
+%%     {\hastp{\G}{e}{\tau}}
+%%     {\hastp{\G}{\variant{\_:e}}{\variant{\rho,\_:\tau}}}
+%%     {}
+%% \qquad
+%% \deduct
+%%     {\hastp{\G}{e}{\variant{\rho_0,l:\tau,\rho_1,\_:\tau}}}
+%%     {\hastp{\G}{e}{\variant{\rho_0,\rho_1,\_:\tau}}}
+%%     {(l\not\in\rho_0,\rho_1)}
+%% \]
+
+\noindent
+\textbf{Row Elimination (Projection)}
+\[
+\deduct
+    {\hastp{\G}{e_0}{\{\rho_0\}}
+     \quad
+     \hastp{\G}{e_1}{\variant{\rho_1}}
+     \quad
+     \projFunRule{\rho_0}{\rho_1}{\tau}
+    }
+    {\hastp{\G}{e_0\projFun e_1}{\tau}}
+    {}
+\qquad
+\deduct
+    {\hastp{\G}{e_0}{\{\rho_0\}}
+     \quad
+     \hastp{\G}{e_1}{\variant{\rho_1}}
+     \quad
+     \projArgRule{\rho_0}{\rho_1}{\tau}
+    }
+    {\hastp{\G}{e_0\projArg e_1}{\tau}}
+    {}
+\]
+
+\noindent
+\textbf{Projection Evaluation}
+\[
+\deduct
+    {\eval{e_0}{\{r\}}
+     \quad
+     \eval{e_1}{\variant{l:e_l}}
+     \quad
+     \haslbltm{r}{l}{e_r}
+     \quad
+     \eval{\app{e_r}{e_l}}{e}
+    }
+    {\eval{e_0\projFun e_1}{e}}
+    {}
+\qquad
+\deduct
+    {\eval{e_0}{\{r\}}
+     \quad
+     \eval{e_1}{\variant{l:e_l}}
+     \quad
+     \haslbltm{r}{l}{e_r}
+     \quad
+     \eval{\app{e_l}{e_r}}{e}
+    }
+    {\eval{e_0\projArg e_1}{e}}
+    {}
+\]
+
+\section{Small-Step Semantics}
+
+These semantics are agnostic about whether we are using default labels. If not, we could simplify
+the system by writing the typing and evaluation rules without using special lookup judgments
+(e.g., ``$\haslbltm{r}{l}{e_r}$'' could be replaced by ``$r = r_1, l{:}e_r, r_2$ where $l\not\in r_1$''.)
+
+% We use $v$ to refer to a value and $r_v$ to refer to the contents of a record value, e.g.,
+
+% \[\begin{array}{rcl}
+% v & \define & \lam{x}{e} \mid \{r_v\} \variant{l:v}
+% \\
+% r_v & \define & \cdot \mid \_ : v \mid l : v, r
+% \\
+% \end{array}
+% \]
+
+\subsection{Core Rules}
+\[
+\deduct
+    {\step{e_0}{e'_0}}
+    {\step{\app{e_0}{e_1}}{\app{e'_0}{e_1}}}
+    {}
+\qquad
+%\deduct
+%    {\step{e_1}{e'_1}}
+%    {\step{\app{v_0}{e_1}}{\app{v_0}{e'_1}}
+%    {}
+%\qquad
+\deduct
+    {}
+    {\step{\app{(\lam{x}{e'})}{e_1}}{e'[x:=e_1]}}
+    {}
+\]
+
+\subsection{If we are using projection}
+
+\[
+\deduct
+    {\step{e_0}{e'_0}}
+    {\step{e_0\#l}{e'_0\#l}}
+    {}
+\qquad
+\deduct
+    {\haslbltm{r}{l}{e_l}}
+    {\step{\{r\}\#l}{e_l}}
+    {}
+\]
+
+\[
+\deduct
+    {\step{e_0}{e'_0}}
+    {\step{\case{e_0}{e_1}}{\case{e'_0}{e_1}}}
+    {}
+\qquad
+\deduct
+    {\step{e_1}{e'_1}}
+    {\step{\case{e_0}{e_1}}{\case{e_0}{e'_1}}}
+    {}
+\qquad
+\deduct
+    {\haslbltm{r}{l}{e_r}}
+    {\step{\case{\variant{l:e_l}}{\{r\}}}{\app{e_r}{e_l}}}
+    {}
+\]
+
+We could enforce left-to-right evaluation by having the second ``case'' rule
+start working on $e_1$ only if $e_0$
+is already a value, but in the absence of side-effects it doesn't matter.
+
+\subsection{If we are using the symmetric version:}
+
+\[
+\deduct
+   {\step{e_0}{e'_0}}
+   {\step{e_0 \projFun e_1}{e'_0 \projFun e_1}}
+   {}
+\qquad
+\deduct
+   {\step{e_1}{e'_1}}
+   {\step{e_0 \projFun e_1}{e_0 \projFun e'_1}}
+   {}
+\qquad
+\deduct
+   {\haslbltm{r}{l}{e_r}}
+   {\step{\{r\} \projFun \variant{l:e_l}}{\app{e_r}{e_l}}}
+   {}
+\]
+
+\[
+\deduct
+   {\step{e_0}{e'_0}}
+   {\step{e_0 \projArg e_1}{e'_0 \projFun e_1}}
+   {}
+\qquad
+\deduct
+   {\step{e_1}{e'_1}}
+   {\step{e_0 \projArg e_1}{e_0 \projFun e'_1}}
+   {}
+\qquad
+\deduct
+   {\haslbltm{r}{l}{e_r}}
+   {\step{\{r\} \projArg \variant{l:e_l}}{\app{e_l}{e_r}}}
+   {}
+\]
+
+\section{Small-Step Correctness}
+
+Note: the following lemmas might not hold (or the proofs might be harder) in the presence of
+implicit $\forall$ generalization/instantiation. I recommend doing the proofs without
+the $\forall$-related typing rules, at least to start.
+
+\todo {check that proofs work with defaults} (will mostly require extending
+lemmas and some logic involving case constraints).
+
+\bigskip
+
+
+We use $v$ to refer to a value. We assume call-by-name, so that record values and
+variant values can contain "unevaluated" expressions.
+
+\[\begin{array}{rcl}
+v & \define & \lam{x}{e} \mid \{r\} \mid \variant{l:e}\\
+\end{array}
+\]
+
+
+\begin{lemma}{Canonical Forms} \label{lem:canonical-forms}
+\mbox{}
+\begin{enumerate}
+\item If $\hastp{\cdot}{v}{\tau_1\to\tau_2}$ then $v$ is $\lam{x}{e}$.
+\item If $\hastp{\cdot}{v}{\{\rho\}}$ then $v$ is $\{r\}$.
+\item If $\hastp{\cdot}{v}{\variant{\rho}}$ then $v$ is $\variant{l:e}$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+Without polymorphism, it follows directly by inspection of the typing rules. (E.g.,
+the only typing rule that lets us conclude a value has an arrow type is the rule for
+typing lambdas, so any value with an arrow type must be a lambda.)
+\end{proof}
+
+\begin{theorem}[Progress]
+if $\hastp{\cdot}{e}{\tau}$ then either $e$ is a value or else $\step{e}{e'}$ for some $e'$.
+\end{theorem}
+
+\begin{proof}
+By (structural) induction on the proof that $\hastp{\cdot}{e}{\tau}$.
+
+If \(e\) is a value, then the proof is complete.
+
+If \(e\) is not a value, we examine the proof tree for \(\hastp \cdot e \tau\).
+
+We consider the possible cases for \(e\), ignoring ones that are values.
+
+\begin{itemize}
+\item Case \(e_0 e_1\).
+    By lemma \ref{lem:inversion}, we know that \(\hastp \cdot {e_0} {\tau_1 \to
+    \tau}\) and \(\hastp \cdot {e_1} \tau_1\).
+
+    There are two cases to consider for \(e_0\).
+
+    If \(e_0\) is a value, then by lemma \ref{lem:canonical-forms} we conclude
+    that \(e_0 = \lambda x. e_0'\) for some \(e_0'\). We may then apply the
+    \(\step {(\lambda x.e_0') e_1} {e_0'[x:=e_1]}\) rule. So for this case, we
+    conclude \(\step e {e'}\) for an \(e' = e_0'[x:=e_1]\).
+
+    If \(e_0\) is not a value, then by the induction hypothesis we know that
+    there exists some \(e_0'\) such that \(\step e_0 {e_0'}\). We may then apply
+    the \(\step {e_0 e_1}{e_0' e_1}\) rule. For this case, we conclude \(\step e
+    {e'}\) for an \(e' = e_0' e_1\).
+
+  \item Case \(e_0 \# \ell\). By lemma \ref{lem:inversion}, we know that
+    \(\hastp \cdot {e_0} {\{\rho\}}\) and that \(\haslbl \rho \ell \tau\).
+
+    If \(e_0\) is a value, then by lemma \ref{lem:canonical-forms}, \(e_0\) is
+    some record \(\{r\}\). By lemma \ref{lem:row-type-term}, \(\haslbltm r \ell
+    {e_0'}\). We may then apply the \(\step {\{r\} \# \ell} {e_0'}\) rule. For this
+    case, we conclude \(\step e {e_0'}\).
+
+    If \(e_0\) is not a value, then by the induction hypothesis we know that
+    there exists some \(e_0'\) such that \(\step e_0 {e_0'}\). We may then apply
+    the \(\step {e_0 \# \ell}{e_0' \# \ell}\) rule. For this case, we conclude
+    \(\step e {e'}\) for an \(e' = e_0' \# \ell\).
+
+  \item Case \(\case e_0 e_1\). By lemma \ref{lem:inversion}, we know \(\hastp
+    \cdot {e_0} {\variant {\rho_0}}\), \(\hastp \cdot {e_1} {\{\rho_1\}}\),
+    and \(\caseVarRcd {\rho_0} {\rho_1} \tau\).
+
+    If either \(e_0\) or \(e_1\) is not a value, we may proceed as in the
+    non-value cases of the application or projection parts of the proof by using
+    the induction hypothesis and the corresponding step rule.
+
+    If both \(e_0\) and \(e_1\) are values, we conclude from lemma
+    \ref{lem:canonical-forms} that \(e_0 = \variant{\ell : e_0'}\) and \(e_1 =
+    \{r\}\). Examining the rules for case constraint, it must be the case that
+    \(\haslbl {\rho_1} \ell {\tau_0 \to \tau}\) because \(\rho_0\) is nonempty
+    (this is trivially true because \(e_0\) is a value with type \(\variant
+    {\rho_0}\)). The only way for \(\rho_1\) to not have label \(\ell\) would be
+    for \(\rho_0\) to not have label \(\ell\). By lemma \ref{lem:row-type-term},
+    it must be the case that \(\haslbltm{r}{\ell}{e_1'}\). Therefore, we may
+    apply rule \(\step {\case {\variant {\ell : e_0'}} {\{r\}}} {e_1' e_0'}\)
+    and this case is complete.
+    
+\end{itemize}
+
+These cases cover all of the non-values. Since the values constitute the base
+cases of the structural induction, and the inductive hypothesis holds, the proof
+is complete.
+
+\end{proof}
+
+\begin{lemma}{Inversion} \label{lem:inversion}
+\mbox{}
+\begin{enumerate}
+\item If $\hastp{\Gamma}{\app{e_0}{e_1}}{\tau}$ then
+  $\hastp{\Gamma}{e_0}{\tau_1\to\tau}$ and $\hastp{\Gamma}{e_1}{\tau_1}$ for some type $\tau_1$.
+\item If $\hastp{\Gamma}{\lam{x}{e}}{\tau}$ then $\tau = (\tau_1\to\tau_2)$ for
+some types $\tau_1$ and $\tau_2$, and
+  $\hastp{\Gamma,x:\tau_1}{e}{\tau_2}$.
+\item If \(\hastp \Gamma {e \# \ell} \tau\), then \(\hastp \Gamma e {\{\rho\}}\)
+  and \(\haslbl \rho \ell \tau\).
+\item If \(\hastp \Gamma {\case e_0 e_1} \tau\), then \(\hastp \Gamma {e_0}
+  {\variant {\rho_0}}\), \(\hastp \Gamma {e_1} {\{\rho_1\}}\), and \(\caseVarRcd
+  {\rho_0} {\rho_1} \tau\).
+\item If \(\hastp \Gamma {\lambda x. e} {\tau_0 \to \tau}\), then \(\hastp
+  {\Gamma, x : \tau_0} e \tau\).
+\item Other facts as needed\ldots
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+By inspection of the inference rules. (I.e., if we have a complete typing proof,
+and there is only one possible typing rule that can give us the corresponding conclusion,
+then the proofs of the premises of that rule must be contained within our assumed typing proof.)
+\end{proof}
+
+\begin{lemma}{Row Type-Term Correspondance} \label{lem:row-type-term}
+  \mbox{}
+  \begin{enumerate}
+  \item If \(\hastp \Gamma {\{r\}} {\{\rho\}}\), then \(\haslbl \rho \ell \tau\)
+    if and only if \(\haslbltm r \ell e\) and \(\hastp \Gamma e \tau\).
+  \item If \(\hastp \Gamma {\variant {\ell : e}} {\variant \rho}\), then
+    \(\haslbl \rho \ell \tau\) and \(\hastp \Gamma e \tau\).
+  \end{enumerate}
+\end{lemma}
+
+\begin{proof}
+  The proofs follow from the respective rules. \todo{fill in later}
+\end{proof}
+
+\begin{theorem}[Preservation]
+If $\hastp{\cdot}{e}{\tau}$ and $\step{e}{e'}$ then $\hastp{\cdot}{e'}{\tau}$.
+\end{theorem}
+
+
+\begin{proof}[Proof Sketch]
+By (structural) induction on the term $e$. We consider all of the possible forms
+that \(e\) can take.
+
+\begin{itemize}
+  \item Case \(\step {e_0 e_1} {e_0' e_1}\). Since \(\hastp \cdot {e_0 e_1}
+    \tau\), lemma \ref{lem:inversion} means that \(\hastp \cdot {e_0} {\tau_0
+      \to \tau}\) and \(\hastp \cdot {e_1} {\tau_0}\).
+
+    By the induction hypothesis, \(\hastp \cdot {e_0'} {\tau_0 \to \tau}\). This
+    allows us to use the application typing rule to derive that \(\hastp \cdot
+    {e_0' e_1} \tau\), as desired.
+  \item Case \(\step {(\lambda x. e')e_1} {e'[x:=e_1]}\). Like the above, since
+    \(\hastp \cdot {(\lambda x.e') e_1} \tau\), lemma \ref{lem:inversion} means
+    that \(\hastp \cdot {(\lambda x.e')} {\tau_0 \to \tau}\) and \(\hastp \cdot
+    {e_1} {\tau_0}\). We may apply lemma \ref{lem:inversion} again to conclude
+    that \(\hastp {x : \tau_0} {e'} \tau\). Lemma \ref{lem:substitution} gives
+    that \(\hastp \cdot {e'[x:=e_1]} \tau\), as desired.
+  \item All other cases involving steps in subparts of the equation have proofs
+    following the same direction (appeal to lemma \ref{lem:inversion} followed
+    by application of the induction hypothesis, then an amendment to the
+    derivation of \(\hastp \cdot e \tau\) that results in \(\hastp \cdot {e'}
+    \tau\)).
+  \item Case \(\step {\{r\} \# \ell} {e_\ell}\). By lemma \ref{lem:inversion},
+    we conclude that \(\hastp \cdot e {\{\rho\}}\) and \(\haslbl \rho \ell
+    \tau\). From this, we may use lemma \ref{lem:row-type-term} to conclude that
+    \(\hastp \cdot {e_\ell} \tau\), as desired.
+  \item Case \(\step {\case {\variant {\ell : e_\ell}} {\{r\}}} {e_r e_\ell}\).
+    By lemma \ref{lem:inversion}, we conclude that \(\hastp \cdot {\variant
+      {\ell : e_\ell}} {\variant {\rho_0}}\), \(\hastp \cdot {\{r\}}
+    {\{\rho_1\}}\), and \(\caseVarRcd {\rho_0} {\rho_1} \tau\). By lemma
+    \ref{lem:row-type-term}, we know that \(\hastp \cdot {e_\ell} {\tau_\ell}\)
+    and \(\haslbl {\rho_0} \ell {\tau_\ell}\). Because \(\caseVarRcd {\rho_0}
+    {\rho_1} \tau\), it must be that \(\haslbl {\rho_1} \ell {\tau_\ell \to
+      \tau}\). By lemma \ref{lem:row-type-term}, we know that \(\haslbltm r \ell
+    {e_r}\) and \(\hastp \cdot {e_r} {\tau_\ell \to \tau}\). The types of
+    \(e_\ell\) and \(e_r\) allow us to derive \(\hastp \cdot {e_\ell e_r}
+    \tau\), as desired.
+\end{itemize}
+
+\end{proof}
+
+\begin{lemma}[Substitution] \label{lem:substitution} If \(\hastp {\Gamma_0, x :
+    \tau_0, \Gamma_1} e \tau\) and \(\hastp {\Gamma_0, \Gamma_1} {e'}
+  {\tau_0}\), then \(\hastp {\Gamma_0, \Gamma_1} {e[x:=\tau_0]} \tau\).
+\end{lemma}
+
+\begin{proof}
+  Follows by induction on the structure of \(e\). I think. \todo{write proof}
+\end{proof}
+
+\begin{theorem}[Soundness]
+If $\hastp{\cdot}{e}{\tau}$ then either $\steps{e}{v}$ for some result value $v$
+(with $\hastp{\cdot}{v}{\tau}$), or
+there is an infinite sequence $e \leadsto e_1 \leadsto e_2 \leadsto \cdots$.
+\end{theorem}
+
+\begin{proof}
+Direct consequence of Preservation and Progress.
+\end{proof}
+
+
+\end{document}
