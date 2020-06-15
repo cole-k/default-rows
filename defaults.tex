@@ -733,12 +733,12 @@ is already a value, but in the absence of side-effects it doesn't matter.
 \[
 \deduct
    {\step{e_0}{e'_0}}
-   {\step{e_0 \projArg e_1}{e'_0 \projFun e_1}}
+   {\step{e_0 \projArg e_1}{e'_0 \projArg e_1}}
    {}
 \qquad
 \deduct
    {\step{e_1}{e'_1}}
-   {\step{e_0 \projArg e_1}{e_0 \projFun e'_1}}
+   {\step{e_0 \projArg e_1}{e_0 \projArg e'_1}}
    {}
 \qquad
 \deduct
@@ -844,7 +844,7 @@ We consider the possible cases for \(e\), ignoring ones that are values.
     it must be the case that \(\haslbltm{r}{\ell}{e_1'}\). Therefore, we may
     apply rule \(\step {\case {\variant {\ell : e_0'}} {\{r\}}} {e_1' e_0'}\)
     and this case is complete.
-    
+
 \end{itemize}
 
 These cases cover all of the non-values. Since the values constitute the base
