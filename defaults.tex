@@ -187,8 +187,6 @@ $FV(e)$ denotes the free term variables of $e$ defined in the usual way where th
 
 \section{Typing}
 
-\todo{Row type lookup needs a context}
-
 \subsection{Type Label Lookup \;($\haslbl{\rho}{l}{\tau}$)}
 \label{subsec:type-lookup}
 \[
@@ -797,6 +795,10 @@ If \(e\) is not a value, we examine the proof tree for \(\hastp \cdot e \tau\).
 We consider the possible cases for \(e\), ignoring ones that are values.
 
 \begin{itemize}
+\item Case \(\tau = \forall \alpha. \tau'\). By lemma \ref{lem:inversion}, we
+  know that \(\hastp \cdot e {\tau'[\alpha := p]}\) for fresh \(p\). We may then
+  continue by proving the statement for this type (removing as many prenex
+  quantifiers in this fashion until we hit one of the below cases).
 \item Case \(e_0 e_1\).
     By lemma \ref{lem:inversion}, we know that \(\hastp \cdot {e_0} {\tau_1 \to
     \tau}\) and \(\hastp \cdot {e_1} \tau_1\).
@@ -854,8 +856,11 @@ is complete.
 \end{proof}
 
 \begin{lemma}{Inversion} \label{lem:inversion}
+Note that all cases aside from 1 apply only if \(\tau\) is not quantified.
 \mbox{}
 \begin{enumerate}
+\item If \(\hastp \Gamma e {\forall \alpha. \tau},\) then for fresh \(p\), \(\hastp \Gamma e
+  {\tau[\alpha := p]}\).
 \item If $\hastp{\Gamma}{\app{e_0}{e_1}}{\tau}$ then
   $\hastp{\Gamma}{e_0}{\tau_1\to\tau}$ and $\hastp{\Gamma}{e_1}{\tau_1}$ for some type $\tau_1$.
 \item If $\hastp{\Gamma}{\lam{x}{e}}{\tau}$ then $\tau = (\tau_1\to\tau_2)$ for
@@ -866,6 +871,8 @@ some types $\tau_1$ and $\tau_2$, and
 \item If \(\hastp \Gamma {\case e_0 e_1} \tau\), then \(\hastp \Gamma {e_0}
   {\variant {\rho_0}}\), \(\hastp \Gamma {e_1} {\{\rho_1\}}\), and \(\caseVarRcd
   {\rho_0} {\rho_1} \tau\).
+\item If \(\hastp \Gamma {\variant {\ell : e}} {\variant \rho}\), then \(\haslbl
+  \rho \ell t\) and \(\hastp \Gamma e \tau\).
 \item If \(\hastp \Gamma {\lambda x. e} {\tau_0 \to \tau}\), then \(\hastp
   {\Gamma, x : \tau_0} e \tau\).
 \item Other facts as needed\ldots
@@ -876,6 +883,14 @@ some types $\tau_1$ and $\tau_2$, and
 By inspection of the inference rules. (I.e., if we have a complete typing proof,
 and there is only one possible typing rule that can give us the corresponding conclusion,
 then the proofs of the premises of that rule must be contained within our assumed typing proof.)
+
+The variant case can either come from a deault variant derivation or a regular
+variant derivation. The latter follows immediately from the rules. The former
+follows from the fact that if a label is in the variant term but not in its
+type, its expression must have the default type.
+
+\todo{this can be fleshed out/formalized a bit}
+
 \end{proof}
 
 \begin{lemma}{Row Type-Term Correspondance} \label{lem:row-type-term}
@@ -889,7 +904,31 @@ then the proofs of the premises of that rule must be contained within our assume
 \end{lemma}
 
 \begin{proof}
-  The proofs follow from the respective rules. \todo{fill in later}
+  The proofs follow from the respective rules.
+  \mbox{}
+  \begin{enumerate}
+  \item \((\Rightarrow)\) Suppose that \(\haslbl \rho \ell \tau\). There are two
+    cases. Note that we ignore the quantifier rule since if we conclude that
+    \(\hastp \Gamma e {\forall \alpha. \tau}\) when we really wanted \(\hastp
+    \Gamma e {\tau[\alpha := \tau']}\), we may simply use the forall elimination
+    derivation to get this result.
+    \begin{itemize}
+    \item \(\ell\) is in \(\rho\). Then for \(\{r\}\) to have type \(\{\rho\}\), it
+      must contain \(\ell\) and furthermore \(e\) must have type \(\tau\). This
+      follows from the fact that only one rule could result in \(\{r\}\) having
+      type \(\{\rho\}\).
+    \item \(\ell\) is not in \(\rho\). Then for \(\{r\}\) to have type
+      \(\{\rho\}\), it must contain a default and furthermore the \(e\)
+      corresponding to this default must have type \(\tau\). This again follows
+      from the fact that there is one rule that could result in \(\{r\}\) having
+      type \(\{\rho\}\).
+    \end{itemize}
+
+    \((\Leftarrow)\) This follows in a similar manner as the forward direction,
+    except with the logic reversed (observe that the term and type level lookups
+    are almost identical; they just deal with different objects).
+  \item This follows from lemma \ref{lem:inversion}.
+  \end{enumerate}
 \end{proof}
 
 \begin{theorem}[Preservation]
@@ -897,11 +936,50 @@ If $\hastp{\cdot}{e}{\tau}$ and $\step{e}{e'}$ then $\hastp{\cdot}{e'}{\tau}$.
 \end{theorem}
 
 
-\begin{proof}[Proof Sketch]
-By (structural) induction on the term $e$. We consider all of the possible forms
-that \(e\) can take.
+\begin{proof}
+  By (structural) induction on the term $e$ and typing derivation \(\hastp \cdot
+  e \tau\). We consider all of the possible forms that \(e\) can take.
+
+\textit{Dealing with quantifiers.} This section is probably no longer necessary.
+
+For each of these rules, whenever we encounter a prenex quantifier in the
+\(\tau\), we cannot use lemma \ref{lem:inversion} to directly get the types we
+want. Instead, we use it on the quantifier(s) until we reach the first \(\tau'\)
+with no prenex quantifiers. This means that \(\tau'\) will have the same inner
+structure as \(\tau\), only with some fresh free variables \(p_1, p_2, \dots\)
+in place of the quantified variables \(\alpha_1, \alpha_2, \dots\). This is
+because the only way to introduce a quantifier is to have a typing derivation
+with fresh free variables (see the quantifier introduction rule). When we invoke
+the induction hypothesis, the new term \(e'\) has type \(\tau'\). This is fine,
+since we know that under the empty context, \(\tau\) may be derived from
+\(\tau'\), so we may do just that.
+
+Symbolically, say we have some \(\hastp \cdot e {\forall \alpha.
+  \tau}\). By lemma \ref{lem:inversion}, the derivation for \(\forall \alpha.
+\tau\) looks like
+
+\[
+\deduct
+    {\hastp{\cdot}{e}{\tau[\alpha := p]}}
+    {\hastp{\cdot}{e}{\forall \alpha . \tau}}
+    {(p\;\text{fresh})}
+\]
+
+Let \(\tau' = \tau[\alpha := p]\). Suppose \(\tau'\) has no prenex quantifier
+(otherwise, we'd keep using lemma \ref{lem:inversion}). Now we may apply one of
+the below rules on \(\hastp \cdot e {\tau'}\) depending on what form \(\step e
+{e'}\) takes. The application of one of these rules lets us conclude \(\hastp
+\cdot {e'} {\tau'}\). At this point we're done, since we know that we can
+perform the inverse of the derivation we used to get \(\tau'\) from \(\tau\) and
+reintroduce the quantifier.
 
 \begin{itemize}
+  \item Case \(\tau = \forall \alpha. \tau'\). If there is a leading quantifier,
+    we may apply lemma \ref{lem:inversion} to conclude that \(\hastp \cdot e
+    {\tau'[\alpha := p]}\) for some fresh \(p\). We may then apply the induction
+    hypothesis to conclude that \(\hastp \cdot {e'} {\tau'[\alpha := p]}\). From
+    this point, it only takes one step (quantifier introduction) to conclude
+    \(\hastp \cdot {e'} {\forall \alpha. \tau'}\) as desired.
   \item Case \(\step {e_0 e_1} {e_0' e_1}\). Since \(\hastp \cdot {e_0 e_1}
     \tau\), lemma \ref{lem:inversion} means that \(\hastp \cdot {e_0} {\tau_0
       \to \tau}\) and \(\hastp \cdot {e_1} {\tau_0}\).
@@ -940,12 +1018,44 @@ that \(e\) can take.
 \end{proof}
 
 \begin{lemma}[Substitution] \label{lem:substitution} If \(\hastp {\Gamma_0, x :
-    \tau_0, \Gamma_1} e \tau\) and \(\hastp {\Gamma_0, \Gamma_1} {e'}
-  {\tau_0}\), then \(\hastp {\Gamma_0, \Gamma_1} {e[x:=\tau_0]} \tau\).
+    \tau_x, \Gamma_1} e \tau\) and \(\hastp {\Gamma_0, \Gamma_1} {e'}
+  {\tau_x}\), then \(\hastp {\Gamma_0, \Gamma_1} {e[x:=e']} \tau\).
 \end{lemma}
 
 \begin{proof}
-  Follows by induction on the structure of \(e\). I think. \todo{write proof}
+  % Follows by induction on the structure of \(e\). I think. \todo{write proof}
+
+  % For the base case (variable case), can use inversion to conclude that if the
+  % variable is not equal to the one subsituted, it must be in either \(\Gamma_0\)
+  % or \(\Gamma_1\) and use that to conclude it works (avoids a weakening lemma).
+
+  We will modify the typing derivation \(\hastp {\Gamma_0, x : \tau_x, \Gamma_1}
+  e \tau\) so that it becomes \(\hastp {\Gamma_0, \Gamma_1} {e[x:=e']} \tau\).
+  This modification can happen recursively, and in most cases all it requires is
+  recursive traversals or empty base cases. The only missing case is that for
+  variables.
+
+  \[
+    \deduct
+      {x : {\tau_x} \in \Gamma}
+      {\hastp \Gamma x {\tau_x}}
+  \]
+
+  Since the substitution will always replace \(x\) with \(e'\), we may modify
+  this case to simply be the proof \(\hastp \Gamma {e'} {\tau_x}\), which is a
+  premise. Since this is the only place where \(x : \tau_x\) is used in the
+  context, it's safe to be removed from the updated context.
+
+  \[
+    \deduct
+      {y : \tau \in \Gamma}
+      {\hastp \Gamma y \tau}
+      {(y \ne x)}
+  \]
+
+  In this case, nothing needs to happen since no substitution will happen in
+  \(y\). And since \(y : \tau\) is not \(x : \tau_x\), it will not be removed
+  from the context of the resulting derivation.
 \end{proof}
 
 \begin{theorem}[Soundness]
