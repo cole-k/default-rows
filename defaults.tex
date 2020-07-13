@@ -856,10 +856,21 @@ is complete.
 \end{proof}
 
 \begin{lemma}{Inversion} \label{lem:inversion}
-  Note that for this lemma, all cases aside from 1 apply only if \(\tau\) is not
-  quantified, but there is a lemma that shows you can attain the same results
+
+  The below cases are true for an arbitrary \(\tau\) which satisifies
+
+  \begin{enumerate}
+    \item \(\tau\) is not quantified (except for case 1).
+    \item \(\tau\) is not derived from a quantifier elimination.
+  \end{enumerate}
+
+  Fortunately, the more general conclusions turn out to be true. Lemma
+  \ref{lem:inversion-from-quantified} shows that you can attain the same results
+  even if \(\tau\) comes from a quantifier elimination. Lemma
+  \ref{lem:inversion-on-quantified} shows that you can attain the same results
   even if \(\tau\) is quantified.
-\mbox{}
+
+  \mbox{}
 \begin{enumerate}
 \item If \(\hastp \Gamma e {\forall \alpha. \tau},\) then for fresh \(p\), \(\hastp \Gamma e
   {\tau[\alpha := p]}\).
@@ -886,39 +897,8 @@ By inspection of the inference rules. (I.e., if we have a complete typing proof,
 and there is only one possible typing rule that can give us the corresponding conclusion,
 then the proofs of the premises of that rule must be contained within our assumed typing proof.)
 
-There are a few caveats, most dealing with cases where there is not only one
-possible typing rule that can get the corresponding conclusion.
-
-The first is a convenience lemma. If the type \(\tau\) is quantified (e.g.
-\(\tau = \forall \alpha. \tau'\)), then we may still reach the same conclusions
-we would be able to reach if \(\tau\) were not (e.g. if \(\hastp \Gamma {e_0
-  e_1} {\forall \alpha. \tau}\), we may still apply case 2). We may use case 1
-of the lemma to obtain \(\hastp \Gamma e {\tau'[\alpha := p]}\) for a fresh
-\(p\), repeating until there are no more prenex quantifiers. Then, we may
-perform the desired inversion. Afterwards, we may use the quantifier
-introduction rule with each of the variables (which remain fresh) to reintroduce
-the quantifiers at prenex on each of the conclusions of the appropriate types.
-
-\todo{maybe the above and below should be its own lemma}
-
-The second is that the derivation could come from a forall elimination, not just
-from the rule that gives the desired conclusion. In which case it would need to
-be argued that the conclusion could still be the same. This is true, and we will
-show it for a single case as an example. The proof generalizes to the remaining
-cases.
-
-Suppose that \(\hastp \Gamma {e_0 e_1} \tau\), but that this conclusion was
-reached from the derivation \(\hastp \Gamma {e_0 e_1} {\forall \alpha.
-  \alpha}\), not from the one which would let us directly conclude the desired
-types. By the convenience lemma proved above, we can conclude that \(\hastp
-\Gamma {e_0} {\tau_1 \to (\forall \alpha. \alpha)}\) and \(\hastp \Gamma {e_1}
-{\tau_1}\). It is known that \(\sigma_1 \to (\forall \alpha. \sigma_2) = \forall
-\alpha. (\sigma_1 \to \sigma_2)\). This means that we can use the quantifier
-elimination rule to conclude that \(\hastp \Gamma {e_0} {\tau_1 \to \tau}\),
-thereby giving the two desired conclusions for \(\hastp \Gamma {e_0 e_1} \tau\).
-
-Finally, the variant case can either come from a deault variant derivation or a
-regular variant derivation. The latter follows immediately from the rules. The
+One caveat: the variant case can either come from a deault variant derivation or
+a regular variant derivation. The latter follows immediately from the rules. The
 former follows from the fact that if a label is in the variant term but not in
 its type, its expression must have the default type.
 
@@ -929,6 +909,98 @@ its type, its expression must have the default type.
 % that the type comes from a forall elimination, which may need some finessing.
 
 \end{proof}
+
+\begin{lemma}{Inversion from quantified types} \label{lem:inversion-from-quantified}
+
+  The cases in \ref{lem:inversion} apply even if \(\tau\) is derived from a
+  quantifier elimination. \(\tau\) may still not be quantified, except for case 1.
+
+\end{lemma}
+
+\begin{proof}
+
+  We first prove the first case of lemma \ref{lem:inversion} still holds. This
+  proof is by structural induction on the typing derivation of \(\tau\).
+
+  Let \(e\) have type \(\forall \alpha. \tau\). Suppose that the type \(\forall
+  \alpha. \tau\) is itself derived from \(\forall \beta. \alpha. \tau'\). It
+  then must be true that for some \(\sigma\), \(\tau'[\beta := \sigma] = \tau\).
+
+  By the induction hypothesis, we may apply lemma \ref{lem:inversion} to
+  \(\forall \beta. \alpha. \tau'\) even if it also came from a quantifier
+  elimination. This allows us to conclude for a fresh \(p\) that \(e\) has type
+  \(\forall \alpha. \tau'[\beta := p]\).
+
+  If this type is now derived from a forall introduction, we are pretty much
+  done. We can obtain that \(e\) has type \(\tau'[\beta := p, \alpha := q]\) for
+  a fresh \(q\), and then reintroduce the quantifier for \(p\). Then we may
+  perform quantifier elimination to substitute \(\sigma\) for \(\beta\).
+
+  However, if this type were not derived from a forall introduction (i.e. if
+  there was a \emph{second} forall elimination), we could simply repeat the
+  previous process until we get a type like \(\tau''[\beta := p_1, \gamma :=
+  p_2, \dots, \alpha = q ]\). We would reintroduce all of the quantifiers for
+  the \(p_i\), then eliminate at the right types to get \(\tau[\alpha := q]\),
+  as desired.
+
+  Now we will prove this lemma true for case 2. The proofs are similar to this
+  proof for the remaining cases.
+  
+  Suppose that \(\hastp \Gamma {e_0 e_1} \tau\), but that this conclusion was
+  reached from the derivation \(\hastp \Gamma {e_0 e_1} {\forall \alpha.
+    \alpha}\), not from the one which would let us directly conclude the desired
+  types. By lemma \ref{lem:inversion}, we can conclude that \(\hastp \Gamma
+  {e_0} {\tau_1 \to (\forall \alpha. \alpha)}\) and \(\hastp \Gamma {e_1}
+  {\tau_1}\). It is known that \(\sigma_1 \to (\forall \alpha. \sigma_2) =
+  \forall \alpha. (\sigma_1 \to \sigma_2)\). This means that we can use the
+  quantifier elimination rule to conclude that \(\hastp \Gamma {e_0} {\tau_1 \to
+    \tau}\), thereby giving the two desired conclusions for \(\hastp \Gamma {e_0
+    e_1} \tau\).
+  
+\end{proof}
+
+\begin{lemma}{Inversion on quantified types} \label{lem:inversion-on-quantified}
+
+  
+  The cases in \ref{lem:inversion} apply even if \(\tau\) is derived from a
+  quantifier elimination (lemma \ref{lem:inversion-from-quantified})
+  \textbf{and} the cases (except for 1) in \ref{lem:inversion} apply even if
+  \(\tau\) is quantified.
+  
+\end{lemma}
+
+\begin{proof}
+  The only thing new is the second half of the proof. We'll prove this for case
+  2 of lemma \ref{lem:inversion}; the same proof technique applies generally to
+  the rest of the cases (obviously ignoring case 1).
+
+  Suppose \(\hastp \Gamma {e_0 e_1} \tau \) for \(\tau = \forall \alpha.
+  \tau'\). Then we may still conclude that \(\hastp \Gamma {e_0} {\tau_1 \to
+    \tau}\) and \(\hastp \Gamma {e_1} {\tau_1}\).
+
+  We may use case 1 of the lemma to obtain \(\hastp \Gamma e {\tau'[\alpha :=
+    p]}\) for a fresh \(p\). If it were the case that the type came from a
+  quantifier elimination, we may still conclude the above by use of lemma
+  \ref{lem:inversion}. Note that lemma \ref{lem:inversion-from-quantified}
+  applies, too.
+  
+  Suppose that \(\tau'\) is not quantified; if it were, we could repeat this
+  step (and the last step) until we reached a part that was not quantified.
+  Because this is only an illustrative proof, we will make it simpler.
+
+  Then, we may perform the desired inversion on \(\hastp \Gamma e {\tau'[\alpha
+    := p]}\). This lets us conclude that \(\hastp \Gamma {e_0} {\tau_1 \to
+    (\tau'[\alpha := p])}\) and \(\hastp \Gamma {e_1} {\tau_1}\).
+
+  The last thing to do is to reintroduce the quantifier on the first conclusion.
+  We may do this because \(p\) is fresh in the type \(\tau'\) (and since
+  \(\tau_1\) should be well-formed, it must only have bound variables, which can
+  be renamed). Thus, we get the type \(\forall \alpha. (\tau_1 \to \alpha)\) which
+  we know is equal to \(\tau_1 \to (\forall \alpha. \alpha)\). This means we
+  conclude \(\hastp \Gamma {e_0} {\tau_1 \to \tau}\), which together with
+  \(\hastp \Gamma {e_1} {\tau_1}\) is the desired form.
+\end{proof}
+
 
 \begin{lemma}{Row Type-Term Correspondance} \label{lem:row-type-term}
   \mbox{}
