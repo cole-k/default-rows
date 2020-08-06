@@ -98,7 +98,7 @@
 
 \subsection{Types}
 \[\begin{array}{rcl}
-\tau & \define & \alpha \mid \forall \alpha. \tau \mid \tau_0 \to \tau_1 \mid \{\rho\} \mid \variant{\rho}
+\tau & \define & \mid \tau_0 \to \tau_1 \mid \{\rho\} \mid \variant{\rho}
 \\
 \rho & \define & \cdot \mid \_ : \tau \mid l : \tau, \rho
 \\
@@ -134,8 +134,6 @@ in~\ref{subsec:type-lookup}.
 \begin{array}{rcl}
   \alpha[\alpha := \tau] & = & \tau \\
   \alpha'[\alpha := \tau] & = & \alpha' \quad(\alpha \neq \alpha') \\
-  (\forall \alpha. \tau')[\alpha := \tau] & = & \forall\alpha.\tau'\\
-  (\forall \alpha'. \tau')[\alpha := \tau] & = & \forall \alpha'' . \tau'[\alpha' := \alpha''][\alpha := \tau] \quad (\alpha \neq \alpha' \,\wedge\, \alpha\neq\alpha'' \,\wedge\, \alpha'' \not\in FV(\tau))\\
   (\tau_0 \to \tau_1)[\alpha := \tau] & = & \tau_0[\alpha:=\tau]\to\tau_1[\alpha:=\tau]\\
   \{\rho\}[\alpha := \tau] & = & \{\rho[\alpha:=\tau]\}\\
   \variant{\rho}[\alpha := \tau] & = & \variant{\rho[\alpha:=\tau]} \\
@@ -204,11 +202,6 @@ We assume that well formed contexts have a single occurrence of any variable.
     {\haslbl{\rho}{l}{\tau}}
     {\haslbl{l':\tau',\rho}{l}{\tau}}
     {(l \neq l')}
-\qquad
-\deduct
-    {\haslbl{\rho}{l}{\forall\alpha.\tau}}
-    {\haslbl{\rho}{l}{\tau[\alpha := \tau']}}
-    {}
 \]
 
 Note that we allow instantiation of polymorphic fields during type
@@ -248,20 +241,6 @@ default label.
 
 \subsection{Typing Rules \;($\hastp{\G}{e}{\tau}$)}
 
-\textbf{Quantifiers}
-\[
-\deduct
-    {\hastp{\G}{e}{\tau[\alpha := p]}}
-    {\hastp{\G}{e}{\forall \alpha . \tau}}
-    {(p\;\text{fresh})}
-\qquad
-\deduct
-    {\hastp{\G}{e}{\forall \alpha.\tau}}
-    {\hastp{\G}{e}{\tau[\alpha := \tau']}}
-    {}
-\]
-
-\noindent
 \textbf{Functions and bound variables}
 \[
 \deduct
@@ -355,17 +334,6 @@ Here are some expressions with their (not necessarily unique) deriveable types:
     {\variant{b:5}}
     {\{a:\lam{x}{x + 1},\_:\lam{x}{x * 0}\}}
 & : &
-\tt{Num}
-\\
-\lam
-    {r}
-    {\case
-      {\variant{b:\tt{``b"}}}
-      {r}
-    }
-& : &
-\{a:{\tt{Num}}\to{\tt{Num}},\_:\forall\alpha.{\alpha}\to{\tt{Num}}\}
-\to
 \tt{Num}
 \\
 \variant{b:\tt{``b"}} & : & \variant{a:\{\},\_:\tt{Text}}
@@ -747,10 +715,6 @@ is already a value, but in the absence of side-effects it doesn't matter.
 
 \section{Small-Step Correctness}
 
-Note: the following lemmas might not hold (or the proofs might be harder) in the presence of
-implicit $\forall$ generalization/instantiation. I recommend doing the proofs without
-the $\forall$-related typing rules, at least to start.
-
 \todo {check that proofs work with defaults} (will mostly require extending
 lemmas and some logic involving case constraints).
 
@@ -795,13 +759,19 @@ If \(e\) is not a value, we examine the proof tree for \(\hastp \cdot e \tau\).
 We consider the possible cases for \(e\), ignoring ones that are values.
 
 \begin{itemize}
-\item Case \(\tau = \forall \alpha. \tau'\). By lemma \ref{lem:inversion}, we
-  know that \(\hastp \cdot e {\tau'[\alpha := p]}\) for fresh \(p\). We may then
-  continue by proving the statement for this type (removing as many prenex
-  quantifiers in this fashion until we hit one of the below cases).
-\item Case \(e_0 e_1\).
-    By lemma \ref{lem:inversion}, we know that \(\hastp \cdot {e_0} {\tau_1 \to
-    \tau}\) and \(\hastp \cdot {e_1} \tau_1\).
+\item Case
+    \[
+      \deduct
+      {\hastp{\G}{e_0}{\tau_1\to\tau}
+      \quad
+      \hastp{\G}{e_1}{\tau_1}
+      }
+      {\hastp{\G}{\app{e_0}{e_1}}{\tau}}
+      {}
+    \]
+
+    We know that \(\hastp \cdot {e_0} {\tau_1 \to \tau}\) and \(\hastp \cdot
+    {e_1} \tau_1\).
 
     There are two cases to consider for \(e_0\).
 
@@ -815,8 +785,19 @@ We consider the possible cases for \(e\), ignoring ones that are values.
     the \(\step {e_0 e_1}{e_0' e_1}\) rule. For this case, we conclude \(\step e
     {e'}\) for an \(e' = e_0' e_1\).
 
-  \item Case \(e_0 \# \ell\). By lemma \ref{lem:inversion}, we know that
-    \(\hastp \cdot {e_0} {\{\rho\}}\) and that \(\haslbl \rho \ell \tau\).
+  \item Case
+    \[
+      \deduct
+      {\hastp{\G}{e}{\{\rho\}}
+      \qquad
+      \haslbl{\rho}{l}{\tau}
+      }
+      {\hastp{\G}{e\#l}{\tau}}
+      {}
+    \]
+
+    We know that \(\hastp \cdot {e_0} {\{\rho\}}\) and
+    that \(\haslbl \rho \ell \tau\).
 
     If \(e_0\) is a value, then by lemma \ref{lem:canonical-forms}, \(e_0\) is
     some record \(\{r\}\). By lemma \ref{lem:row-type-term}, \(\haslbltm r \ell
@@ -828,9 +809,21 @@ We consider the possible cases for \(e\), ignoring ones that are values.
     the \(\step {e_0 \# \ell}{e_0' \# \ell}\) rule. For this case, we conclude
     \(\step e {e'}\) for an \(e' = e_0' \# \ell\).
 
-  \item Case \(\case e_0 e_1\). By lemma \ref{lem:inversion}, we know \(\hastp
-    \cdot {e_0} {\variant {\rho_0}}\), \(\hastp \cdot {e_1} {\{\rho_1\}}\),
-    and \(\caseVarRcd {\rho_0} {\rho_1} \tau\).
+  \item Case
+    \[
+      \deduct
+      {\hastp{\G}{e_0}{\variant{\rho_0}}
+      \quad
+      \hastp{\G}{e_1}{\{\rho_1\}}
+      \quad
+      \caseVarRcd{\rho_0}{\rho_1}{\tau}
+      }
+      {\hastp{\G}{\case{e_0}{e_1}}{\tau}}
+      {}
+    \]
+
+    We know \(\hastp \cdot {e_0} {\variant {\rho_0}}\), \(\hastp \cdot {e_1}
+    {\{\rho_1\}}\), and \(\caseVarRcd {\rho_0} {\rho_1} \tau\).
 
     If either \(e_0\) or \(e_1\) is not a value, we may proceed as in the
     non-value cases of the application or projection parts of the proof by using
@@ -857,26 +850,10 @@ is complete.
 
 \begin{lemma}{Inversion} \label{lem:inversion}
 
-  The below cases are true for an arbitrary \(\tau\) which satisifies
-
-  \begin{enumerate}
-    \item \(\tau\) is not quantified (except for case 1).
-    \item \(\tau\) is not derived from a quantifier elimination.
-  \end{enumerate}
-
-  Fortunately, the more general conclusions turn out to be true. Lemma
-  \ref{lem:inversion-from-quantified} shows that you can attain the same results
-  even if \(\tau\) comes from a quantifier elimination. Lemma
-  \ref{lem:inversion-on-quantified} shows that you can attain the same results
-  even if \(\tau\) is quantified. Except for in
-  \ref{lem:inversion-from-quantified} and \ref{lem:inversion-on-quantified}, you
-  can assume that references to this lemma assume an arbitrary \(\tau\) because
-  the above are true.
+  The following hold:
 
   \mbox{}
 \begin{enumerate}
-\item If \(\hastp \Gamma e {\forall \alpha. \tau},\) then for fresh \(p\), \(\hastp \Gamma e
-  {\tau[\alpha := p]}\).
 \item If $\hastp{\Gamma}{\app{e_0}{e_1}}{\tau}$ then
   $\hastp{\Gamma}{e_0}{\tau_1\to\tau}$ and $\hastp{\Gamma}{e_1}{\tau_1}$ for some type $\tau_1$.
 \item If $\hastp{\Gamma}{\lam{x}{e}}{\tau}$ then $\tau = (\tau_1\to\tau_2)$ for
@@ -913,98 +890,6 @@ its type, its expression must have the default type.
 
 \end{proof}
 
-\begin{lemma}{Inversion from quantified types} \label{lem:inversion-from-quantified}
-
-  The cases in \ref{lem:inversion} apply even if \(\tau\) is derived from a
-  quantifier elimination. \(\tau\) may still not be quantified, except for case 1.
-
-\end{lemma}
-
-\begin{proof}
-
-  We first prove the first case of lemma \ref{lem:inversion} still holds. This
-  proof is by structural induction on the typing derivation of \(\tau\).
-
-  Let \(e\) have type \(\forall \alpha. \tau\). Suppose that the type \(\forall
-  \alpha. \tau\) is itself derived from \(\forall \beta. \alpha. \tau'\). It
-  then must be true that for some \(\sigma\), \(\tau'[\beta := \sigma] = \tau\).
-
-  By the induction hypothesis, we may apply lemma \ref{lem:inversion} to
-  \(\forall \beta. \alpha. \tau'\) even if it also came from a quantifier
-  elimination. This allows us to conclude for a fresh \(p\) that \(e\) has type
-  \(\forall \alpha. \tau'[\beta := p]\).
-
-  If this type is now derived from a forall introduction, we are pretty much
-  done. We can obtain that \(e\) has type \(\tau'[\beta := p, \alpha := q]\) for
-  a fresh \(q\), and then reintroduce the quantifier for \(p\). Then we may
-  perform quantifier elimination to substitute \(\sigma\) for \(\beta\).
-
-  However, if this type were not derived from a forall introduction (i.e. if
-  there was a \emph{second} forall elimination), we could simply repeat the
-  previous process until we get a type like \(\tau''[\beta := p_1, \gamma :=
-  p_2, \dots, \alpha = q ]\). We would reintroduce all of the quantifiers for
-  the \(p_i\), then eliminate at the right types to get \(\tau[\alpha := q]\),
-  as desired.
-
-  Now we will prove this lemma true for case 2. The proofs are similar to this
-  proof for the remaining cases.
-  
-  Suppose that \(\hastp \Gamma {e_0 e_1} \tau\), but that this conclusion was
-  reached from the derivation \(\hastp \Gamma {e_0 e_1} {\forall \alpha.
-    \alpha}\), not from the one which would let us directly conclude the desired
-  types. By lemma \ref{lem:inversion}, we can conclude that \(\hastp \Gamma
-  {e_0} {\tau_1 \to (\forall \alpha. \alpha)}\) and \(\hastp \Gamma {e_1}
-  {\tau_1}\). It is known that \(\sigma_1 \to (\forall \alpha. \sigma_2) =
-  \forall \alpha. (\sigma_1 \to \sigma_2)\). This means that we can use the
-  quantifier elimination rule to conclude that \(\hastp \Gamma {e_0} {\tau_1 \to
-    \tau}\), thereby giving the two desired conclusions for \(\hastp \Gamma {e_0
-    e_1} \tau\).
-  
-\end{proof}
-
-\begin{lemma}{Inversion on quantified types} \label{lem:inversion-on-quantified}
-
-  
-  The cases in \ref{lem:inversion} apply even if \(\tau\) is derived from a
-  quantifier elimination (lemma \ref{lem:inversion-from-quantified})
-  \textbf{and} the cases (except for 1) in \ref{lem:inversion} apply even if
-  \(\tau\) is quantified.
-  
-\end{lemma}
-
-\begin{proof}
-  The only thing new is the second half of the proof. We'll prove this for case
-  2 of lemma \ref{lem:inversion}; the same proof technique applies generally to
-  the rest of the cases (obviously ignoring case 1).
-
-  Suppose \(\hastp \Gamma {e_0 e_1} \tau \) for \(\tau = \forall \alpha.
-  \tau'\). Then we may still conclude that \(\hastp \Gamma {e_0} {\tau_1 \to
-    \tau}\) and \(\hastp \Gamma {e_1} {\tau_1}\).
-
-  We may use case 1 of the lemma to obtain \(\hastp \Gamma e {\tau'[\alpha :=
-    p]}\) for a fresh \(p\). If it were the case that the type came from a
-  quantifier elimination, we may still conclude the above by use of lemma
-  \ref{lem:inversion}. Note that lemma \ref{lem:inversion-from-quantified}
-  applies, too.
-  
-  Suppose that \(\tau'\) is not quantified; if it were, we could repeat this
-  step (and the last step) until we reached a part that was not quantified.
-  Because this is only an illustrative proof, we will make it simpler.
-
-  Then, we may perform the desired inversion on \(\hastp \Gamma e {\tau'[\alpha
-    := p]}\). This lets us conclude that \(\hastp \Gamma {e_0} {\tau_1 \to
-    (\tau'[\alpha := p])}\) and \(\hastp \Gamma {e_1} {\tau_1}\).
-
-  The last thing to do is to reintroduce the quantifier on the first conclusion.
-  We may do this because \(p\) is fresh in the type \(\tau'\) (and since
-  \(\tau_1\) should be well-formed, it must only have bound variables, which can
-  be renamed). Thus, we get the type \(\forall \alpha. (\tau_1 \to \alpha)\) which
-  we know is equal to \(\tau_1 \to (\forall \alpha. \alpha)\). This means we
-  conclude \(\hastp \Gamma {e_0} {\tau_1 \to \tau}\), which together with
-  \(\hastp \Gamma {e_1} {\tau_1}\) is the desired form.
-\end{proof}
-
-
 \begin{lemma}{Row Type-Term Correspondance} \label{lem:row-type-term}
   \mbox{}
   \begin{enumerate}
@@ -1020,10 +905,7 @@ its type, its expression must have the default type.
   \mbox{}
   \begin{enumerate}
   \item \((\Rightarrow)\) Suppose that \(\haslbl \rho \ell \tau\). There are two
-    cases. Note that we ignore the quantifier rule since if we conclude that
-    \(\hastp \Gamma e {\forall \alpha. \tau}\) when we really wanted \(\hastp
-    \Gamma e {\tau[\alpha := \tau']}\), we may simply use the forall elimination
-    derivation to get this result.
+    cases.
     \begin{itemize}
     \item \(\ell\) is in \(\rho\). Then for \(\{r\}\) to have type \(\{\rho\}\), it
       must contain \(\ell\) and furthermore \(e\) must have type \(\tau\). This
@@ -1052,46 +934,7 @@ If $\hastp{\cdot}{e}{\tau}$ and $\step{e}{e'}$ then $\hastp{\cdot}{e'}{\tau}$.
   By (structural) induction on the term $e$ and typing derivation \(\hastp \cdot
   e \tau\). We consider all of the possible forms that \(e\) can take.
 
-\textit{Dealing with quantifiers.} This section is probably no longer necessary.
-
-For each of these rules, whenever we encounter a prenex quantifier in the
-\(\tau\), we cannot use lemma \ref{lem:inversion} to directly get the types we
-want. Instead, we use it on the quantifier(s) until we reach the first \(\tau'\)
-with no prenex quantifiers. This means that \(\tau'\) will have the same inner
-structure as \(\tau\), only with some fresh free variables \(p_1, p_2, \dots\)
-in place of the quantified variables \(\alpha_1, \alpha_2, \dots\). This is
-because the only way to introduce a quantifier is to have a typing derivation
-with fresh free variables (see the quantifier introduction rule). When we invoke
-the induction hypothesis, the new term \(e'\) has type \(\tau'\). This is fine,
-since we know that under the empty context, \(\tau\) may be derived from
-\(\tau'\), so we may do just that.
-
-Symbolically, say we have some \(\hastp \cdot e {\forall \alpha.
-  \tau}\). By lemma \ref{lem:inversion}, the derivation for \(\forall \alpha.
-\tau\) looks like
-
-\[
-\deduct
-    {\hastp{\cdot}{e}{\tau[\alpha := p]}}
-    {\hastp{\cdot}{e}{\forall \alpha . \tau}}
-    {(p\;\text{fresh})}
-\]
-
-Let \(\tau' = \tau[\alpha := p]\). Suppose \(\tau'\) has no prenex quantifier
-(otherwise, we'd keep using lemma \ref{lem:inversion}). Now we may apply one of
-the below rules on \(\hastp \cdot e {\tau'}\) depending on what form \(\step e
-{e'}\) takes. The application of one of these rules lets us conclude \(\hastp
-\cdot {e'} {\tau'}\). At this point we're done, since we know that we can
-perform the inverse of the derivation we used to get \(\tau'\) from \(\tau\) and
-reintroduce the quantifier.
-
 \begin{itemize}
-  \item Case \(\tau = \forall \alpha. \tau'\). If there is a leading quantifier,
-    we may apply lemma \ref{lem:inversion} to conclude that \(\hastp \cdot e
-    {\tau'[\alpha := p]}\) for some fresh \(p\). We may then apply the induction
-    hypothesis to conclude that \(\hastp \cdot {e'} {\tau'[\alpha := p]}\). From
-    this point, it only takes one step (quantifier introduction) to conclude
-    \(\hastp \cdot {e'} {\forall \alpha. \tau'}\) as desired.
   \item Case \(\step {e_0 e_1} {e_0' e_1}\). Since \(\hastp \cdot {e_0 e_1}
     \tau\), lemma \ref{lem:inversion} means that \(\hastp \cdot {e_0} {\tau_0
       \to \tau}\) and \(\hastp \cdot {e_1} {\tau_0}\).
