@@ -608,6 +608,41 @@ projection of any suitable label.
     {}
 \]
 
+\section{Default Labels}
+
+There are multiple interpretations we can think for default labels, specifically
+with regards to projection and \texttt{case} of the default label itself.
+Everything else works similarly between interpretations. Since projection can be
+thought of as a special \texttt{case}, we'll only deal with the latter.
+
+\begin{enumerate}
+\item The way that is described in this system presently treats the default
+  label as a regular label in a record. A variant with a default label matches
+  the default label in a record it is \texttt{case}d with.
+
+  However, the presence of a default label makes all lookups suceed. If a
+  variant fails to match any labels direclty in a record for a \texttt{case}, it
+  matches with the default label.
+
+  So this assigns a special meaning to an otherwise normal label.
+
+\item Another way we can think of the default label as is a selector for
+  everything that is not in the variant. However, if the default label in a
+  variatn matches with multiple functions in its corresponding record, what do
+  we do with all of their return values? A function typically cannot return a
+  variable number of values.
+
+  One solution that lets us match everything missing is to impose a constraint
+  upon \texttt{case} statements. Specifically, \texttt{case} statements would
+  take a third argument: a combining function \(f\). If the return type of each
+  function in the record argument is \(\tau\), then \(f : \tau \to \tau \to
+  \tau\). By necessity, \(f\) would need to be commutative.
+
+  This would let us, for example, collect all of the results that don't match
+  into a list like so
+  \[\case {\variant{\_ : ()}} {\{a : \lambda x. [1], b : \lambda x. [2]\}} = [1,2]\]
+\end{enumerate}
+
 \section{Small-Step Semantics}
 
 These semantics are agnostic about whether we are using default labels. If not, we could simplify
